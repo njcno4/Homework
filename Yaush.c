@@ -23,16 +23,40 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+
+struct CMD{
+	char name[128];
+	char path[128];
+};
+typedef struct CMD CMD;
+
+
 static char input = '\0';
 static char ** commandArray;
 static char ** toExecute;
 static char *** options;
 static int commandArrayIndex = 0;
+static CMD command_tab[2048];
+static int list_index, len;
+static int max_i = 0 ;
+
+char * command_generator (const char * text, int state);
+char ** completion (const char * text, int start, int end);
 
 void interpret_history_command(char * line);
 void nextLine(){
 	printf("Oui Maitre ? >>");
 }
+
+char * dumpstring (char *s)
+{
+  char *r;
+
+  r = (char*) malloc (strlen (s) + 1);
+  strcpy (r, s);
+  return (r);
+}
+
 
 void listenCommand(){
 	int i;
@@ -126,12 +150,12 @@ void interpret_command (char * line){
 }
 
 void interpret_history_command(char * line){
-/* Interpret history commands. Should begin with the string hist-.
+	/* Interpret history commands. Should begin with the string hist-.
 	hist-save saves history list in history.txt,
 	hist-read loads history.txt
 	hist-list list history
 	hist-clear clears history list
-*/
+	 */
 	if(strcmp(line, "hist-save") == 0){
 		write_history ("history.txt");
 		printf("history saved in \"history.txt\" \n");
@@ -167,35 +191,41 @@ void interpret_history_command(char * line){
 		printf("Unknown history command \n");
 }
 
-void init_shell(){
-	//prints the name of all the files in the directory in the file "command_list.txt"
-	DIR *dir;
-	struct dirent *entry;
-	FILE * command_list = NULL;
-	command_list = fopen("command_list.txt", "w+");
-	if(command_list == NULL){
-		printf("Error writting command list, exiting. \n");
-		exit(0);
-	}
-	dir = opendir ("/bin");
-	if(dir != NULL){
-		while((entry = readdir(dir)) != NULL){
-			if (entry->d_type == DT_REG){
-				fputs(entry->d_name, command_list);
-				fputc('\n', command_list);}
-		}
-	}
-	else{
-		printf("Error opening /bin \n");
-	}
-	closedir(dir);
+int compare( const void * word1, const void * word2) {
+	CMD * w1 = (CMD *) word1;
+	CMD * w2 = (CMD *) word2;
+	return strcmp(w1->name, w2->name);
+}
+void construct_command_tab(){
+	//prints the name of all the files in the directory in the static "command_tab" and puts it in alphabetical order
+		DIR *dir;
+		struct dirent *entry;
 
-	dir = opendir ("/usr/bin");
+
+		dir = opendir ("/bin");
+
 		if(dir != NULL){
 			while((entry = readdir(dir)) != NULL){
 				if (entry->d_type == DT_REG){
-					fputs(entry->d_name, command_list);
-					fputc('\n', command_list);}
+					strcpy(command_tab[max_i].name, entry->d_name);
+					strcpy(command_tab[max_i].path, "/bin/");
+					max_i++;
+				}
+			}
+		}
+		else{
+			printf("Error opening /bin \n");
+		}
+		closedir(dir);
+
+		dir = opendir ("/usr/bin");
+		if(dir != NULL){
+			while((entry = readdir(dir)) != NULL){
+				if (entry->d_type == DT_REG){
+					strcpy(command_tab[max_i].name, entry->d_name);
+					strcpy(command_tab[max_i].path, "/usr/bin/");
+					max_i++;
+				}
 			}
 		}
 		else{
@@ -204,28 +234,87 @@ void init_shell(){
 		closedir(dir);
 
 		dir = opendir ("/sbin");
-			if(dir != NULL){
-				while((entry = readdir(dir)) != NULL){
-					if (entry->d_type == DT_REG){
-						fputs(entry->d_name, command_list);
-						fputc('\n', command_list);}
+		if(dir != NULL){
+			while((entry = readdir(dir)) != NULL){
+				if (entry->d_type == DT_REG){
+					strcpy(command_tab[max_i].name, entry->d_name);
+					strcpy(command_tab[max_i].path, "/sbin/");
+					max_i++;
 				}
 			}
-			else{
-				printf("Error opening /sbin \n");
-			}
-			closedir(dir);
-			fclose(command_list);
+		}
+		else{
+			printf("Error opening /sbin \n");
+		}
+		closedir(dir);
+
+		qsort (command_tab, max_i, sizeof(CMD), compare);
 }
+
+void initialize_readline(){
+	printf("In init readline \n");
+	rl_readline_name = "Yaush";
+	rl_attempted_completion_function = completion;
+}
+
+
+char ** completion (const char * text, int start, int end){
+
+	char **matches;
+	  matches = (char **)NULL;
+	  if (start == 0)
+		    matches = rl_completion_matches (text, command_generator);
+
+
+	  return (matches);
+
+}
+
+char * command_generator (const char * text, int state){
+
+char  name[128];
+
+
+
+  if (!state)
+    {
+      list_index = 0;
+      len = strlen (text);
+      state = 1;
+    }
+
+  /* Return the next name which partially matches from the command list. */
+  while ( list_index < max_i)
+      {
+	  	strncpy(name, command_tab[list_index].name, len);
+
+
+        if (strncmp (name, text, len) == 0){
+        	return (dumpstring(command_tab[list_index].name));
+        	printf("command_tab : %s;  name: %s; index = %d \n", command_tab[list_index].name, name, list_index);
+        }
+        list_index++;
+      }
+
+  printf("not found\n");
+  return ((char *)NULL);
+}
+void init_shell(){
+	using_history ();
+	write_history ("history.txt");
+	construct_command_tab();
+	initialize_readline();
+}
+
+
 
 int main(int argc, char ** argv) {
 	char *line, *history_tmp;
-	//initialize_readline();
-	using_history ();
-	write_history ("history.txt");
+
+
 	init_shell();
 	welcome_msg();
-
+	printf("command_tab 0 : %s\n", command_tab[10].name);
 
 	while(1){
 		line = readline("Oui maitre >>>");
