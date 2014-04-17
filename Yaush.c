@@ -13,6 +13,7 @@
 #include <curses.h>
 #include <unistd.h>
 #include <string.h>
+#include <dirent.h>
 #include <sys/types.h>
 #include <sys/file.h>
 #include <sys/stat.h>
@@ -125,7 +126,12 @@ void interpret_command (char * line){
 }
 
 void interpret_history_command(char * line){
-
+/* Interpret history commands. Should begin with the string hist-.
+	hist-save saves history list in history.txt,
+	hist-read loads history.txt
+	hist-list list history
+	hist-clear clears history list
+*/
 	if(strcmp(line, "hist-save") == 0){
 		write_history ("history.txt");
 		printf("history saved in \"history.txt\" \n");
@@ -155,10 +161,61 @@ void interpret_history_command(char * line){
 			clear_history();
 			write_history ("history.txt");
 		}
-		printf("history cleared \n", strncmp(answer, "Y", 1));
+		printf("history cleared \n");
 	}
 	else
 		printf("Unknown history command \n");
+}
+
+void init_shell(){
+	//prints the name of all the files in the directory in the file "command_list.txt"
+	DIR *dir;
+	struct dirent *entry;
+	FILE * command_list = NULL;
+	command_list = fopen("command_list.txt", "w+");
+	if(command_list == NULL){
+		printf("Error writting command list, exiting. \n");
+		exit(0);
+	}
+	dir = opendir ("/bin");
+	if(dir != NULL){
+		while((entry = readdir(dir)) != NULL){
+			if (entry->d_type == DT_REG){
+				fputs(entry->d_name, command_list);
+				fputc('\n', command_list);}
+		}
+	}
+	else{
+		printf("Error opening /bin \n");
+	}
+	closedir(dir);
+
+	dir = opendir ("/usr/bin");
+		if(dir != NULL){
+			while((entry = readdir(dir)) != NULL){
+				if (entry->d_type == DT_REG){
+					fputs(entry->d_name, command_list);
+					fputc('\n', command_list);}
+			}
+		}
+		else{
+			printf("Error opening /usr/bin \n");
+		}
+		closedir(dir);
+
+		dir = opendir ("/sbin");
+			if(dir != NULL){
+				while((entry = readdir(dir)) != NULL){
+					if (entry->d_type == DT_REG){
+						fputs(entry->d_name, command_list);
+						fputc('\n', command_list);}
+				}
+			}
+			else{
+				printf("Error opening /sbin \n");
+			}
+			closedir(dir);
+			fclose(command_list);
 }
 
 int main(int argc, char ** argv) {
@@ -166,6 +223,7 @@ int main(int argc, char ** argv) {
 	//initialize_readline();
 	using_history ();
 	write_history ("history.txt");
+	init_shell();
 	welcome_msg();
 
 
