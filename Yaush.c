@@ -18,6 +18,7 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/errno.h>
+#include <sys/wait.h>
 
 
 #include <readline/readline.h>
@@ -31,22 +32,17 @@ struct CMD{
 typedef struct CMD CMD;
 
 
-static char input = '\0';
-static char ** commandArray;
-static char ** toExecute;
-static char *** options;
-static int commandArrayIndex = 0;
 static CMD command_tab[2048];
 static int list_index, len;
 static int max_i = 0 ;
+
+
 
 char * command_generator (const char * text, int state);
 char ** completion (const char * text, int start, int end);
 
 void interpret_history_command(char * line);
-void nextLine(){
-	printf("Oui Maitre ? >>");
-}
+
 
 char * dumpstring (char *s)
 {
@@ -58,32 +54,9 @@ char * dumpstring (char *s)
 }
 
 
-void listenCommand(){
-	int i;
-	int characterIndex = 0;
 
-	//Destroy old command
-	for(i = 0; i < commandArrayIndex; i++)
-		commandArray[commandArrayIndex - 1 - i] = NULL;
-	commandArrayIndex = 0;
-
-	//Store new command in commandArray
-
-	while(input != '\n'){
-		//While enter is not pressed then store command in array.
-		while(input != ' '){
-			//While input
-			commandArray[commandArrayIndex][characterIndex] = input;
-			characterIndex ++;
-			input = getchar();
-		}
-		characterIndex = 0;
-		commandArrayIndex ++;
-		input = getchar();
-	}
-}
-
-void executeCommand(){
+void executeCommand(char * command_path, char ** argv){
+	execv(command_path, argv);
 	pid_t pid_process;
 
 	pid_process = fork();
@@ -93,18 +66,18 @@ void executeCommand(){
 		exit(1);
 		break;
 	case 0:
-		//executer le code
+
 		break;
 	default:
-		//wait();
+		//wait(pid_process);
 		break;
 	}
 }
 
 void welcome_msg(){
-	printf("----------------------- \n");
-	printf("This is a shell project \n");
-	printf("----------------------- \n");
+	printf("------------------------------------------------------------------- \n");
+	printf("------------------This is a shell project --------------------------\n");
+	printf("------------------------------------------------------------------- \n");
 }
 
 char * test_white (char * line){
@@ -138,14 +111,64 @@ char * test_white (char * line){
 	return new_line;
 }
 
+
+int verify_command(char * command){
+	//Verifies if the command is in the command_tab list.
+	// if yes, returns its index, otherwise, returns -1
+	int i;
+	for(i = 0; i < max_i; i++){
+		if(strcmp(command_tab[i].name, command) == 0 )
+			return i;
+	}
+	return -1;
+}
 void interpret_command (char * line){
+	int i;
+	char * command_vect_tmp;
+	char * command_vect;
+	char * argv[128];
+	char   command_path[256];
+	int command_vect_index = 0;
+	int exists = 0;
+
+	if(line == NULL)
+		return;
 
 	//interpreting history command
 	if(strncmp (line, "hist-", 5) == 0){
 		interpret_history_command(line);
 	}
+	command_vect_tmp = strtok(line, " ");
+	while(command_vect_tmp != NULL)
+	  {
+		if(command_vect_index == 0){
+		command_vect = command_vect_tmp;
+		printf ("command vect %d : %s\n",command_vect_index, command_vect);
+		command_vect_index++;
+	    command_vect_tmp = strtok (NULL, " ");
+		}
+		else{
+			argv[command_vect_index - 1] = command_vect_tmp;
+			printf ("arg index %d : %s\n",command_vect_index, argv[command_vect_index - 1]);
+			command_vect_index++;
+			command_vect_tmp = strtok (NULL, " ");
+		}
 
-	//action = check_for_action(line);
+	  }
+
+
+		exists = verify_command(command_vect);
+		if(exists == -1){
+			printf("No such command. \n");
+			return;
+		}
+
+
+		strcpy(command_path, command_tab[exists].path);
+		strcat(command_path, command_tab[exists].name);
+		 executeCommand(command_path,argv);
+
+
 
 }
 
@@ -252,9 +275,9 @@ void construct_command_tab(){
 }
 
 void initialize_readline(){
-	printf("In init readline \n");
+
 	rl_readline_name = "Yaush";
-	rl_attempted_completion_function = completion;
+	//rl_attempted_completion_function = completion;
 }
 
 
@@ -276,11 +299,11 @@ char  name[128];
 
 
 
-  if (!state)
+  if (list_index == max_i)
     {
       list_index = 0;
       len = strlen (text);
-      state = 1;
+
     }
 
   /* Return the next name which partially matches from the command list. */
@@ -299,6 +322,8 @@ char  name[128];
   printf("not found\n");
   return ((char *)NULL);
 }
+
+
 void init_shell(){
 	using_history ();
 	write_history ("history.txt");
@@ -314,7 +339,7 @@ int main(int argc, char ** argv) {
 
 	init_shell();
 	welcome_msg();
-	printf("command_tab 0 : %s\n", command_tab[10].name);
+
 
 	while(1){
 		line = readline("Oui maitre >>>");
@@ -328,7 +353,7 @@ int main(int argc, char ** argv) {
 			append_history (1, "history.txt");
 		}
 
-		interpret_command(line);
+		interpret_command(history_tmp);
 
 		if (strcmp (line, "exit") == 0)
 		{
