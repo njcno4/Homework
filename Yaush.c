@@ -8,6 +8,8 @@
  ============================================================================
  */
 
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <curses.h>
@@ -24,25 +26,27 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+#define BG 0;
+#define FG 1;
+
 
 struct CMD{
 	char name[128];
-	char path[128];
+	char path[1024];
 };
 typedef struct CMD CMD;
 
 
-
-static CMD command_tab[2048];
-static int list_index, len;
+static CMD command_tab[10192];
+//static int list_index, len;
 static int max_i = 0 ;
 
 
-char * command_generator (const char * text, int state);
-char ** completion (const char * text, int start, int end);
+//char * command_generator (const char * text, int state);
+//char ** completion (const char * text, int start, int end);
 void interpret_history_command(char * line);
 char * dumpstring (char *s);
-void executeCommand(char * command_path, char ** argv);
+void executeCommand(char * command_path, char ** argv, int state_bg);
 void welcome_msg();
 char * test_white (char * line);
 int verify_command(char * command);
@@ -50,8 +54,6 @@ int verify_command(char * command);
 int compare( const void * word1, const void * word2);
 void construct_command_tab();
 void initialize_readline();
-char ** completion (const char * text, int start, int end);
-char * command_generator (const char * text, int state);
 void init_shell();
 void interpret_command (char * line);
 void cd (char ** argv);
@@ -70,13 +72,14 @@ void cd(char ** argv){
 
 
 void interpret_command (char * line){
+
 	char * command_vect_tmp;
 	char * command_vect;
 	char * argv[128] ;
 	char command_path[256];
 	int command_vect_index = 0;
 	int exists = 0;
-
+	int state_bg = 1;
 
 
 
@@ -104,9 +107,19 @@ void interpret_command (char * line){
 		}
 
 	}
+
+
+	if(strcmp(argv[command_vect_index - 1],"bg") == 0){
+		state_bg = 0;
+		command_vect_index --;
+	}
 	argv[command_vect_index] = NULL;
 
-
+	int i = 0;
+	while(argv[i] != NULL){
+		printf("argv[%d] = %s \n", i, argv[i]);
+		i++;
+	}
 
 
 	if (strcmp (line, "cd") == 0){
@@ -129,7 +142,7 @@ void interpret_command (char * line){
 
 	strcpy(command_path, command_tab[exists].path);
 	strcat(command_path, command_tab[exists].name);
-	executeCommand(command_path,argv);
+	executeCommand(command_path,argv, state_bg);
 
 
 	return;
@@ -146,30 +159,56 @@ char * dumpstring (char *s)
 
 
 
-void executeCommand(char * command_path, char ** argv){
+void executeCommand(char * command_path, char ** argv, int state_bg){
 	// executes the programm in command_path with arguments in argv.
 
 	pid_t pid_process;
 	pid_process = fork();
+	int status;
+
+
+	if(state_bg){
+
+	}
 	switch (pid_process){
+
 	case -1:
 		printf("Fork failure \n Exiting \n");
 		exit(1);
 		break;
+
 	case 0:
+		printf("fils, pid_fork %d \n", pid_process);
 		execv(command_path, argv);
 		exit(EXIT_SUCCESS);
 		break;
+
 	default:
-		wait(NULL);
+
+		printf("Père, pid_fork %d \n", pid_process);
+		printf("State21354 : %d \n", state_bg);
+		if(state_bg){
+			printf("Père, avant wait \n");
+			waitpid(pid_process, &status, WUNTRACED);
+			printf("Père, après wait \n");
+		}
+		else{
+			printf("+ [%d] %s \n", (int) pid_process, command_path);
+		}
+		printf("Exit status: %d \n", status);
 		break;
+
+
 	}
+
+
 }
 
 void welcome_msg(){
 	printf("------------------------------------------------------------------- \n");
 	printf("------------------This is a shell project--------------------------\n");
 	printf("------------------------------------------------------------------- \n");
+
 }
 
 char * test_white (char * line){
@@ -193,7 +232,7 @@ char * test_white (char * line){
 			return NULL;
 	}
 	int up_index = (length_line - begining_line_index);
-	char * new_line =  (char*) malloc(up_index * sizeof(char));
+	char * new_line =  (char*) malloc((up_index + 1) * sizeof(char));
 
 
 	for( i = 0; i < up_index; i++){
@@ -270,55 +309,37 @@ void construct_command_tab(){
 	//prints the name of all the files in the directory in the static "command_tab" and puts it in alphabetical order
 	DIR *dir;
 	struct dirent *entry;
+	char * path_vect;
+	char * path_buf;
 
+	path_vect = getenv("PATH");
 
-	dir = opendir ("/bin");
-
-	if(dir != NULL){
-		while((entry = readdir(dir)) != NULL){
-			if (entry->d_type == DT_REG){
-				strcpy(command_tab[max_i].name, entry->d_name);
-				strcpy(command_tab[max_i].path, "/bin/");
-				max_i++;
+	path_buf = strtok (path_vect,":");
+	while (path_buf != NULL)
+	{
+		dir = opendir (path_buf);
+		if(dir != NULL){
+			while((entry = readdir(dir)) != NULL){
+				if (entry->d_type == DT_REG){
+					strcpy(command_tab[max_i].name, entry->d_name);
+					strcpy(command_tab[max_i].path, path_buf);
+					strcat(command_tab[max_i].path, "/");
+					max_i++;
+				}
 			}
 		}
-	}
-	else{
-		printf("Error opening /bin \n");
-	}
-	closedir(dir);
-
-	dir = opendir ("/usr/bin");
-	if(dir != NULL){
-		while((entry = readdir(dir)) != NULL){
-			if (entry->d_type == DT_REG){
-				strcpy(command_tab[max_i].name, entry->d_name);
-				strcpy(command_tab[max_i].path, "/usr/bin/");
-				max_i++;
-			}
+		else{
+			printf("Error opening /bin \n");
 		}
-	}
-	else{
-		printf("Error opening /usr/bin \n");
-	}
-	closedir(dir);
+		closedir(dir);
 
-	dir = opendir ("/sbin");
-	if(dir != NULL){
-		while((entry = readdir(dir)) != NULL){
-			if (entry->d_type == DT_REG){
-				strcpy(command_tab[max_i].name, entry->d_name);
-				strcpy(command_tab[max_i].path, "/sbin/");
-				max_i++;
-			}
-		}
+
+		path_buf = strtok (NULL, ":");
 	}
-	else{
-		printf("Error opening /sbin \n");
-	}
-	closedir(dir);
+
 
 	qsort (command_tab, max_i, sizeof(CMD), compare);
+
 }
 
 void initialize_readline(){
@@ -328,7 +349,7 @@ void initialize_readline(){
 }
 
 
-char ** completion (const char * text, int start, int end){
+/*char ** completion (const char * text, int start, int end){
 
 	char **matches;
 	matches = (char **)NULL;
@@ -353,7 +374,7 @@ char * command_generator (const char * text, int state){
 
 	}
 
-	/* Return the next name which partially matches from the command list. */
+	// Return the next name which partially matches from the command list.
 	while ( list_index < max_i)
 	{
 		strncpy(name, command_tab[list_index].name, len);
@@ -368,7 +389,7 @@ char * command_generator (const char * text, int state){
 
 	printf("not found\n");
 	return ((char *)NULL);
-}
+}*/
 
 
 void init_shell(){
