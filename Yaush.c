@@ -30,6 +30,9 @@
 #define FG 1;
 
 
+int redir_stdout = 0;
+int redir_stdin = 0;
+char descriptor_name[128];
 struct CMD{
 	char name[128];
 	char path[1024];
@@ -108,11 +111,30 @@ void interpret_command (char * line){
 
 	}
 
+	if (command_vect_index > 1){
+		if(strcmp(argv[command_vect_index - 2],">>") == 0){
+			redir_stdout = 1;
+			strcpy(descriptor_name , argv[command_vect_index -1]);
+			command_vect_index = command_vect_index - 2;
+		}
+		else
+			redir_stdout = 0;
 
+		if(strcmp(argv[command_vect_index - 2],"<<") == 0){
+			redir_stdin = 1;
+			strcpy(descriptor_name , argv[command_vect_index -1]);
+			command_vect_index = command_vect_index - 2;
+		}
+		else
+			redir_stdin = 0;
+	}
 	if(strcmp(argv[command_vect_index - 1],"bg") == 0){
 		state_bg = 0;
 		command_vect_index --;
 	}
+
+	//printf("%d \n", command_vect_index);
+
 	argv[command_vect_index] = NULL;
 
 	int i = 0;
@@ -166,6 +188,7 @@ void executeCommand(char * command_path, char ** argv, int state_bg){
 	pid_process = fork();
 	int status;
 
+	int devNull;
 
 	if(state_bg){
 
@@ -178,7 +201,17 @@ void executeCommand(char * command_path, char ** argv, int state_bg){
 		break;
 
 	case 0:
-		printf("fils, pid_fork %d \n", pid_process);
+		if(redir_stdout == 1){
+			devNull  = open(descriptor_name, O_CREAT | O_TRUNC | O_WRONLY, 0600);
+			dup2(devNull, STDOUT_FILENO);
+		}
+
+		if(!state_bg){
+			devNull = open("/dev/null", O_WRONLY);
+			printf("fils, pid_fork %d \n", pid_process);
+			dup2(devNull, STDOUT_FILENO);
+		}
+
 		execv(command_path, argv);
 		exit(EXIT_SUCCESS);
 		break;
@@ -188,9 +221,13 @@ void executeCommand(char * command_path, char ** argv, int state_bg){
 		printf("Père, pid_fork %d \n", pid_process);
 		printf("State21354 : %d \n", state_bg);
 		if(state_bg){
+
 			printf("Père, avant wait \n");
+
 			waitpid(pid_process, &status, WUNTRACED);
+
 			printf("Père, après wait \n");
+
 		}
 		else{
 			printf("+ [%d] %s \n", (int) pid_process, command_path);
@@ -339,6 +376,9 @@ void construct_command_tab(){
 
 
 	qsort (command_tab, max_i, sizeof(CMD), compare);
+	/*int i;
+	for(i = 0; i < max_i; i++)
+	printf("%s \t %s \n", command_tab[i].name, command_tab[i].path);*/
 
 }
 
