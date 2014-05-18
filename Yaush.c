@@ -53,7 +53,7 @@ void executeCommand(char * command_path, char ** argv, int state_bg);
 void welcome_msg();
 char * test_white (char * line);
 int verify_command(char * command);
-
+void executeCommand_pipe(char * command_path_1, char ** argv_1, char * command_path_2, char ** argv_2);
 int compare( const void * word1, const void * word2);
 void construct_command_tab();
 void initialize_readline();
@@ -79,12 +79,18 @@ void interpret_command (char * line){
 	char * command_vect_tmp;
 	char * command_vect;
 	char * argv[128] ;
+	char * argv_1[64];
+	char * argv_2[64];
 	char command_path[256];
+	char command_path_1[256];
+	char command_path_2[256];
 	int command_vect_index = 0;
 	int exists = 0;
+	int exists_1 = 0;
+	int exists_2 = 0;
 	int state_bg = 1;
-
-
+	int i;
+	int j;
 
 	if(line == NULL)
 		return;
@@ -127,7 +133,60 @@ void interpret_command (char * line){
 		}
 		else
 			redir_stdin = 0;
+
+		for(i = 0; i < command_vect_index; i++){
+
+			if(strcmp(argv[i],"|") == 0){
+				for(j = 0; j < i; j++){
+					argv_1[j] = argv[j];
+				}
+				argv_1[i] = NULL;
+
+				for(j = 0; j < command_vect_index - i - 1; j++){
+					printf("argv[%d] = %s \n", j + i + 1, argv[j+i+1]);
+					argv_2[j] = argv[j+i+1];
+
+					printf("argv_2[%d] = %s \n", j, argv_2[j]);
+				}
+				argv_2[command_vect_index - i - 1] = NULL;
+
+				exists_1 = verify_command(argv_1[0]);
+
+				if(exists_1 == -1){
+					printf("No such command. \n");
+					return;
+				}
+
+				strcpy(command_path_1, command_tab[exists_1].path);
+				strcat(command_path_1, command_tab[exists_1].name);
+
+				exists_2 = verify_command(argv_2[0]);
+
+				if(exists_2 == -1){
+					printf("No such command. \n");
+					return;
+				}
+
+				strcpy(command_path_2, command_tab[exists_2].path);
+				strcat(command_path_2, command_tab[exists_2].name);
+
+				int w1 = 0;
+				while(argv_1[w1] != NULL){
+					printf("argv_1[%d] = %s \n", w1, argv_1[w1]);
+					w1++;
+				}
+				int w2 = 0;
+				while(argv_2[w2] != NULL){
+					printf("argv_2[%d] = %s \n", w2, argv_2[w2]);
+					w2++;
+				}
+				executeCommand_pipe(command_path_1,  argv_1,  command_path_2,  argv_2);
+
+				return;
+			}
+		}
 	}
+
 	if(strcmp(argv[command_vect_index - 1],"bg") == 0){
 		state_bg = 0;
 		command_vect_index --;
@@ -137,10 +196,10 @@ void interpret_command (char * line){
 
 	argv[command_vect_index] = NULL;
 
-	int i = 0;
-	while(argv[i] != NULL){
-		printf("argv[%d] = %s \n", i, argv[i]);
-		i++;
+	int w = 0;
+	while(argv[w] != NULL){
+		printf("argv[%d] = %s \n", w, argv[w]);
+		w++;
 	}
 
 
@@ -152,6 +211,7 @@ void interpret_command (char * line){
 		printf("Good Bye \n");
 		exit(EXIT_SUCCESS);
 	}
+
 	exists = verify_command(command_vect);
 
 	if(exists == -1){
@@ -179,7 +239,71 @@ char * dumpstring (char *s)
 	return (r);
 }
 
+void executeCommand_pipe(char * command_path_1, char ** argv_1, char * command_path_2, char ** argv_2){
+	pid_t pid_process;
+	pid_t pid_process_2;
+	pid_process = fork();
+	int status1;
+	//int status2;
+	int pipe_1[2];
+	pipe(pipe_1);
+	//char buffer[128];
 
+	switch (pid_process){
+
+	case -1:
+		printf("Fork failure \n Exiting \n");
+		exit(1);
+		break;
+
+	case 0:
+
+		pid_process_2 = fork();
+		//read(pipe_1[0], buffer, 128);
+		//printf("%s \n", buffer);
+		switch (pid_process_2){
+
+			case -1:
+				printf("Fork failure \n Exiting \n");
+				exit(1);
+				break;
+
+			case 0:
+				close(pipe_1[1]);
+				printf("Ici grep \n");
+				dup2(pipe_1[0], STDIN_FILENO);
+				close(pipe_1[0]);
+				execv(command_path_2, argv_2);
+				printf("Fin grep \n");
+				exit(EXIT_SUCCESS);
+				break;
+
+			default:
+				close(pipe_1[0]);
+				printf("Ici ps \n");
+				dup2(pipe_1[1],STDOUT_FILENO);
+				close(pipe_1[1]);
+				execv(command_path_1, argv_1);
+				printf("Fin ps \n");
+				break;
+			}
+		exit(EXIT_SUCCESS);
+		break;
+
+	default:
+
+		//printf("Père, pid_fork %d \n", pid_process);
+		waitpid(pid_process, &status1, WUNTRACED);
+		//printf("Exit status: %d \n", status);
+
+		break;
+
+	}
+
+
+
+
+}
 
 void executeCommand(char * command_path, char ** argv, int state_bg){
 	// executes the programm in command_path with arguments in argv.
@@ -190,9 +314,7 @@ void executeCommand(char * command_path, char ** argv, int state_bg){
 
 	int devNull;
 
-	if(state_bg){
 
-	}
 	switch (pid_process){
 
 	case -1:
@@ -204,12 +326,13 @@ void executeCommand(char * command_path, char ** argv, int state_bg){
 		if(redir_stdout == 1){
 			devNull  = open(descriptor_name, O_CREAT | O_TRUNC | O_WRONLY, 0600);
 			dup2(devNull, STDOUT_FILENO);
-		}
+		}else{
 
-		if(!state_bg){
-			devNull = open("/dev/null", O_WRONLY);
-			printf("fils, pid_fork %d \n", pid_process);
-			dup2(devNull, STDOUT_FILENO);
+			if(!state_bg){
+				devNull = open("/dev/null", O_WRONLY);
+				printf("fils, pid_fork %d \n", pid_process);
+				dup2(devNull, STDOUT_FILENO);
+			}
 		}
 
 		execv(command_path, argv);
