@@ -10,9 +10,10 @@ void executeCommand_pipe(char * command_path_1, char ** argv_1, char * command_p
 	pid_process = fork();
 	int status1;
 	//int status2;
-	int pipe_1[2];
-	pipe(pipe_1);
-	//char buffer[128];
+	int par[2], chd[2];
+	pipe(par);
+	pipe(chd);
+	//char buffer[1024];
 
 	switch (pid_process){
 
@@ -34,20 +35,22 @@ void executeCommand_pipe(char * command_path_1, char ** argv_1, char * command_p
 				break;
 
 			case 0:
-				close(pipe_1[1]);
+				dup2(par[0], STDIN_FILENO);
+				//dup2(chd[1], STDOUT_FILENO);
+				close(par[0]);close(par[1]);
+				close(chd[0]); close(chd[1]);
 				printf("Ici grep \n");
-				dup2(pipe_1[0], STDIN_FILENO);
-				close(pipe_1[0]);
 				execv(command_path_2, argv_2);
 				printf("Fin grep \n");
 				exit(EXIT_SUCCESS);
 				break;
 
 			default:
-				close(pipe_1[0]);
+				//dup2(chd[0], STDIN_FILENO);
+				dup2(par[1], STDOUT_FILENO);
+				close(par[0]);close(par[1]);
+				close(chd[0]); close(chd[1]);
 				printf("Ici ps \n");
-				dup2(pipe_1[1],STDOUT_FILENO);
-				close(pipe_1[1]);
 				execv(command_path_1, argv_1);
 				printf("Fin ps \n");
 				break;
