@@ -144,11 +144,6 @@ void interpret_command (char * line){
 
 	argv[command_vect_index] = NULL;
 
-	int w = 0;
-	while(argv[w] != NULL){
-		printf("argv[%d] = %s \n", w, argv[w]);
-		w++;
-	}
 
 
 	if (strcmp (line, "cd") == 0){

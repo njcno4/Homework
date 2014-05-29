@@ -5,15 +5,14 @@
 
 
 void executeCommand_pipe(char * command_path_1, char ** argv_1, char * command_path_2, char ** argv_2){
+	// execute program when | is typed
 	pid_t pid_process;
 	pid_t pid_process_2;
 	pid_process = fork();
 	int status1;
-	//int status2;
 	int par[2], chd[2];
 	pipe(par);
 	pipe(chd);
-	//char buffer[1024];
 
 	switch (pid_process){
 
@@ -25,8 +24,6 @@ void executeCommand_pipe(char * command_path_1, char ** argv_1, char * command_p
 	case 0:
 
 		pid_process_2 = fork();
-		//read(pipe_1[0], buffer, 128);
-		//printf("%s \n", buffer);
 		switch (pid_process_2){
 
 			case -1:
@@ -36,7 +33,6 @@ void executeCommand_pipe(char * command_path_1, char ** argv_1, char * command_p
 
 			case 0:
 				dup2(par[0], STDIN_FILENO);
-				//dup2(chd[1], STDOUT_FILENO);
 				close(par[0]);close(par[1]);
 				close(chd[0]); close(chd[1]);
 				printf("Ici grep \n");
@@ -46,7 +42,6 @@ void executeCommand_pipe(char * command_path_1, char ** argv_1, char * command_p
 				break;
 
 			default:
-				//dup2(chd[0], STDIN_FILENO);
 				dup2(par[1], STDOUT_FILENO);
 				close(par[0]);close(par[1]);
 				close(chd[0]); close(chd[1]);
@@ -60,9 +55,7 @@ void executeCommand_pipe(char * command_path_1, char ** argv_1, char * command_p
 
 	default:
 
-		//printf("Père, pid_fork %d \n", pid_process);
 		waitpid(pid_process, &status1, WUNTRACED);
-		//printf("Exit status: %d \n", status);
 
 		break;
 
@@ -98,7 +91,6 @@ void executeCommand(char * command_path, char ** argv, int state_bg){
 
 			if(!state_bg){
 				devNull = open("/dev/null", O_WRONLY);
-				printf("fils, pid_fork %d \n", pid_process);
 				dup2(devNull, STDOUT_FILENO);
 			}
 		}
@@ -109,16 +101,9 @@ void executeCommand(char * command_path, char ** argv, int state_bg){
 
 	default:
 
-		printf("Père, pid_fork %d \n", pid_process);
-		printf("State21354 : %d \n", state_bg);
+
 		if(state_bg){
-
-			printf("Père, avant wait \n");
-
 			waitpid(pid_process, &status, WUNTRACED);
-
-			printf("Père, après wait \n");
-
 		}
 		else{
 			printf("+ [%d] %s \n", (int) pid_process, command_path);
@@ -261,9 +246,6 @@ void construct_command_tab(){
 
 
 	qsort (command_tab, max_i, sizeof(CMD), compare);
-	/*int i;
-	for(i = 0; i < max_i; i++)
-	printf("%s \t %s \n", command_tab[i].name, command_tab[i].path);*/
 
 }
 
