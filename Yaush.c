@@ -35,9 +35,7 @@ void executeCommand_pipe(char * command_path_1, char ** argv_1, char * command_p
 				dup2(par[0], STDIN_FILENO);
 				close(par[0]);close(par[1]);
 				close(chd[0]); close(chd[1]);
-				printf("Ici grep \n");
 				execv(command_path_2, argv_2);
-				printf("Fin grep \n");
 				exit(EXIT_SUCCESS);
 				break;
 
@@ -45,9 +43,7 @@ void executeCommand_pipe(char * command_path_1, char ** argv_1, char * command_p
 				dup2(par[1], STDOUT_FILENO);
 				close(par[0]);close(par[1]);
 				close(chd[0]); close(chd[1]);
-				printf("Ici ps \n");
 				execv(command_path_1, argv_1);
-				printf("Fin ps \n");
 				break;
 			}
 		exit(EXIT_SUCCESS);
@@ -87,7 +83,11 @@ void executeCommand(char * command_path, char ** argv, int state_bg){
 		if(redir_stdout == 1){
 			devNull  = open(descriptor_name, O_CREAT | O_TRUNC | O_WRONLY, 0600);
 			dup2(devNull, STDOUT_FILENO);
-		}else{
+		}else if(redir_stdin == 1){
+			devNull  = open(descriptor_name, O_WRONLY);
+			dup2(devNull, STDIN_FILENO);
+		}
+		else{
 
 			if(!state_bg){
 				devNull = open("/dev/null", O_WRONLY);

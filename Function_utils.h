@@ -118,16 +118,7 @@ void interpret_command (char * line){
 				strcpy(command_path_2, command_tab[exists_2].path);
 				strcat(command_path_2, command_tab[exists_2].name);
 
-				int w1 = 0;
-				while(argv_1[w1] != NULL){
-					printf("argv_1[%d] = %s \n", w1, argv_1[w1]);
-					w1++;
-				}
-				int w2 = 0;
-				while(argv_2[w2] != NULL){
-					printf("argv_2[%d] = %s \n", w2, argv_2[w2]);
-					w2++;
-				}
+
 				executeCommand_pipe(command_path_1,  argv_1,  command_path_2,  argv_2);
 
 				return;
